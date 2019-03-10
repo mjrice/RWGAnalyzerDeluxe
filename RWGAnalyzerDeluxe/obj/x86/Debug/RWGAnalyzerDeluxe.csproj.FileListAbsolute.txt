@@ -1,0 +1,14 @@
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\bin\x86\Debug\RWGAnalyzerDeluxe.exe.config
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\bin\x86\Debug\RWGAnalyzerDeluxe.exe
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\bin\x86\Debug\RWGAnalyzerDeluxe.pdb
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\RWGAnalyzerDeluxe.csprojResolveAssemblyReference.cache
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\MainWindow.g.cs
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\App.g.cs
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\RWGAnalyzerDeluxe_MarkupCompile.cache
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\RWGAnalyzerDeluxe_MarkupCompile.lref
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\MainWindow.baml
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\RWGAnalyzerDeluxe.g.resources
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\RWGAnalyzerDeluxe.Properties.Resources.resources
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\RWGAnalyzerDeluxe.csproj.GenerateResource.Cache
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\RWGAnalyzerDeluxe.exe
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x86\Debug\RWGAnalyzerDeluxe.pdb

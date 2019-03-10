@@ -1,0 +1,13 @@
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\bin\x64\Release\RWGAnalyzerDeluxe.exe.config
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\bin\x64\Release\RWGAnalyzerDeluxe.exe
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\bin\x64\Release\RWGAnalyzerDeluxe.pdb
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\MainWindow.g.cs
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\App.g.cs
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe_MarkupCompile.cache
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe_MarkupCompile.lref
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\MainWindow.baml
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe.g.resources
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe.Properties.Resources.resources
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe.csproj.GenerateResource.Cache
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe.exe
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe.pdb
