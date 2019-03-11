@@ -505,6 +505,7 @@ namespace RWGAnalyzerDeluxe
                         newitem.name = nextName;
                         newitem.count = 1;
                         newitem.type = 0;
+                        thisItemType = 0;
                         for (k = 1; k < typenames.Length; k++)
                         {
                             if (typenames[k].Length > 0) // sanity check
@@ -518,54 +519,55 @@ namespace RWGAnalyzerDeluxe
                         }
                         namesList.Add(newitem);
                     }
+
+
+                    result = location.Split(charSeparators, StringSplitOptions.None);
+                    int xLocation = Int16.Parse(result[0]);
+                    int yLocation = Int16.Parse(result[1]);
+                    int zLocation = Int16.Parse(result[2]);
+
+                    // trader locations are also tracked specially here so that we can analyze them separate from other pois                
+                    if (nextName.Contains("trader"))
+                    {
+                        traderList.Add(location);
+                    }
+
+                    //
+                    // keep track of the most distant locations in each dimension:
+                    //
+                    if (xLocation > maxXLocation) maxXLocation = xLocation;
+                    if (xLocation < minXLocation) minXLocation = xLocation;
+
+                    if (yLocation > maxYLocation) maxYLocation = yLocation;
+                    if (yLocation < minYLocation) minYLocation = yLocation;
+
+                    if (zLocation > maxZLocation) maxZLocation = zLocation;
+                    if (zLocation < minZLocation) minZLocation = zLocation;
+
+                    //
+                    // sort the the prefab into the correct bin on the grid
+                    // (only if it is checked on the legend)
+                    //           
+                    if (thisItemType < 0 || thisItemType >= typenamesInclude.Length)
+                    {
+                        Console.WriteLine("Error encountered during processing!", ConsoleClassType.ResultClass.summary);
+                        return;
+                    }
+
+                    if (typenamesInclude[thisItemType] == true)
+                    {
+                        float xbin = (float)(xLocation - worldminXLocation) / widthX;
+                        int xbinInt = (int)(xbin);
+
+                        float zbin = (float)(zLocation - worldminZLocation) / widthZ;
+                        int zbinInt = (int)(zbin);
+                        zbinInt = (gridFactor - 1) - zbinInt;
+
+                        bins[xbinInt, zbinInt] += 1;
+                        RefreshBins(xbinInt, zbinInt);
+                    }
+                    else excludedCount++;
                 }
-                
-                result = location.Split(charSeparators, StringSplitOptions.None);
-                int xLocation = Int16.Parse(result[0]);
-                int yLocation = Int16.Parse(result[1]);
-                int zLocation = Int16.Parse(result[2]);
-
-                // trader locations are also tracked specially here so that we can analyze them separate from other pois                
-                if (nextName.Contains("trader")) 
-                {
-                    traderList.Add(location);
-                }
-
-                //
-                // keep track of the most distant locations in each dimension:
-                //
-                if (xLocation > maxXLocation) maxXLocation = xLocation;
-                if (xLocation < minXLocation) minXLocation = xLocation;
-
-                if (yLocation > maxYLocation) maxYLocation = yLocation;
-                if (yLocation < minYLocation) minYLocation = yLocation;
-
-                if (zLocation > maxZLocation) maxZLocation = zLocation;
-                if (zLocation < minZLocation) minZLocation = zLocation;
-
-                //
-                // sort the the prefab into the correct bin on the grid
-                // (only if it is checked on the legend)
-                //           
-                if(thisItemType<0||thisItemType>=typenamesInclude.Length)
-                {
-                    Console.WriteLine("Error encountered during processing!", ConsoleClassType.ResultClass.summary);
-                    return;
-                }
-
-                if (typenamesInclude[thisItemType] == true)
-                {
-                    float xbin = (float)(xLocation - worldminXLocation) / widthX;
-                    int xbinInt = (int)(xbin);
-
-                    float zbin = (float)(zLocation - worldminZLocation) / widthZ;
-                    int zbinInt = (int)(zbin);
-                    zbinInt = (gridFactor - 1) - zbinInt;
-
-                    bins[xbinInt, zbinInt] += 1;
-                    RefreshBins(xbinInt, zbinInt);
-                }
-                else excludedCount++;
                 System.Windows.Forms.Application.DoEvents();
             }
 
