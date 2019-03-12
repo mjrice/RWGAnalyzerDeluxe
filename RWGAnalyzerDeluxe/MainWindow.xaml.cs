@@ -14,6 +14,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.IO;
 
 namespace RWGAnalyzerDeluxe
 {
@@ -72,7 +73,7 @@ namespace RWGAnalyzerDeluxe
         };
 
         int gridFactor    = 10;
-        int gridFactorMax = 16;
+        int gridFactorMax = 20;
         int gridFactorMin = 4;
 
         string worldFolder = "";
@@ -162,10 +163,10 @@ namespace RWGAnalyzerDeluxe
             colorBins = new Color[gridFactorMax, gridFactorMax];
             namesList = new List<itemType>();
             traderList= new List<string>();
-            typecounts= new int[13];
-            typenames = new string[13];
-            typenamesInclude = new bool[13];
-            typenames_ignore = new string[2];
+            typecounts       = new int[14];
+            typenames        = new string[14];
+            typenamesInclude = new bool[14];
+            typenames_ignore = new string[4];
 
             typenames[0] = "other";
             typenames[1] = "trader";
@@ -180,8 +181,11 @@ namespace RWGAnalyzerDeluxe
             typenames[10] = "cave";
             typenames[11] = "factory";
             typenames[12] = "field";
+            typenames[13] = "army";
             typenames_ignore[0] = "sign";
             typenames_ignore[1] = "street_light";
+            typenames_ignore[2] = "tree_";
+            typenames_ignore[3] = "player_start";
 
             for (i = 0; i < typenames.Length; i++) typenamesInclude[i] = true;
 
@@ -245,7 +249,7 @@ namespace RWGAnalyzerDeluxe
                 }
             }
 
-            Analyze(false);
+            RefreshButton.IsEnabled = true;
         }
 
         private DialogResult GetFolder()
@@ -264,8 +268,12 @@ namespace RWGAnalyzerDeluxe
         {
             worldFolder = "";
 
-            if(GetFolder() == System.Windows.Forms.DialogResult.OK)
+            if (GetFolder() == System.Windows.Forms.DialogResult.OK)
+            {
+                SetAllButtonsEnabled(false);
                 Analyze();
+                SetAllButtonsEnabled(true);
+            }
         }
 
         private UIElement GetGridChildElement(Grid grid, int row, int column)
@@ -290,6 +298,7 @@ namespace RWGAnalyzerDeluxe
 
         private void ProcessBiomesBitmap(string fp)
         {
+            
             Uri biomesUri = new Uri(fp + "/biomes.png");
             BitmapImage img = new BitmapImage(biomesUri);
             int x, z;
@@ -401,7 +410,12 @@ namespace RWGAnalyzerDeluxe
 
             if(initialize) SetupGrid();
 
-            if (worldFolder.Length < 2) return;
+            if (worldFolder.Length < 2)
+            {
+                Console.WriteLine("This does not look like a valid path.", ConsoleClassType.ResultClass.summary);
+                return;
+            }
+
             Console.ClearAll();
             this.Title = "RWGAnalyzer [" + worldFolder + "]";
             TextBlockStatus.Text = "Working...";
@@ -449,7 +463,16 @@ namespace RWGAnalyzerDeluxe
                 System.Diagnostics.Debug.WriteLine("Loading biome image");
                 if (System.IO.File.Exists(worldFolder + "/biomes.png"))
                 {
-                    ProcessBiomesBitmap(worldFolder);
+                    FileStream fi = File.OpenRead (worldFolder + "/biomes.png");
+                    long filesize = fi.Length;
+                    fi.Close();
+
+                    if(filesize < 90000)
+                    {
+                        Console.WriteLine("The biomes map file (biomes.png) does not look like a valid PNG... skipping biome analysis");
+                    }
+                    else 
+                        ProcessBiomesBitmap(worldFolder);
                 }
                 else
                 {
@@ -519,7 +542,6 @@ namespace RWGAnalyzerDeluxe
                         }
                         namesList.Add(newitem);
                     }
-
 
                     result = location.Split(charSeparators, StringSplitOptions.None);
                     int xLocation = Int16.Parse(result[0]);
@@ -725,21 +747,42 @@ namespace RWGAnalyzerDeluxe
 
             System.Diagnostics.Debug.WriteLine("Finished ::Analyze()");
             TextBlockStatus.Text = "";
+            RefreshButton.IsEnabled = false;
 
         }
+        
+        private void SetAllButtonsEnabled(bool b)
+        {            
+            if(b==false) RefreshButton.IsEnabled = b;
+            GridGoLargerButton.IsEnabled = b;
+            GridGoSmallerButton.IsEnabled = b;
+            ChooseWorldButton.IsEnabled = b;
 
+        }
         private void Button_Click_1(object sender, RoutedEventArgs e)
         {
             gridFactor-=2;
             if (gridFactor < gridFactorMin) gridFactor = gridFactorMin;
+            SetAllButtonsEnabled(false);
             Analyze(true);
+            SetAllButtonsEnabled(true);
         }
 
         private void Button_Click_2(object sender, RoutedEventArgs e)
         {
             gridFactor+=2;
             if (gridFactor > gridFactorMax) gridFactor = gridFactorMax;
+            SetAllButtonsEnabled(false);
             Analyze(true);
+            SetAllButtonsEnabled(true);
+
+        }
+
+        private void Button_Click_3(object sender, RoutedEventArgs e)
+        {
+            SetAllButtonsEnabled(false);
+            Analyze(false);
+            SetAllButtonsEnabled(true);
         }
     }
 }
