@@ -30,6 +30,109 @@ namespace RWGAnalyzerDeluxe
             public int type;
         };
 
+        public class CoordType
+        {
+            public int X;
+            public int Y;
+            public int Z;
+
+            public CoordType()
+            {
+                X = 0;
+                Y = 0;
+                Z = 0;
+            }
+
+            public void Parse(string input)
+            {
+                //CoordType result = new CoordType();
+                string[] resultstr;
+                char[] charSeparators = new char[] { ',' };
+                resultstr = input.Split(charSeparators, StringSplitOptions.None);
+                X = Int16.Parse(resultstr[0]);
+                Y = Int16.Parse(resultstr[1]);
+                if(resultstr.Length>2) Z = Int16.Parse(resultstr[2]);                
+            }
+
+            public double distanceTo(CoordType other)
+            {
+                double d = Math.Sqrt((this.X - other.X) * (this.X - other.X) + (this.Z - other.Z) * (this.Z - other.Z));
+                return d;
+            }
+        };
+
+        public class ColorTableItem
+        {
+            public Color color;
+            public uint count;
+        };
+
+        List<ColorTableItem> biomeColors;
+
+        public class WorldMapGridType
+        {
+            public static int gridFactorMax=28;
+            public static int gridFactorMin=4;
+            public int gridFactor;
+            public int minXLocation;
+            public int minZLocation;
+            public float gridWidthX;
+            public float gridWidthZ;
+            public int sizeX;
+            public int sizeZ;
+
+            public WorldMapGridType()
+            {
+                gridFactor = 10;                
+            }
+
+            // initialize world map grid with the given world size (X and Z, don't care about Y)
+            public void Init(int sx,int sz)
+            {
+                sizeX = sx;
+                sizeZ = sz; // yes 
+                gridWidthX = (float)sizeX / gridFactor;
+                gridWidthZ = (float)sizeZ / gridFactor; 
+                minXLocation = -sizeX / 2;
+                minZLocation = -sizeZ / 2;
+            }
+
+            public void setGridFactor(int fact)
+            {
+                gridFactor = fact;
+                if (gridFactor < gridFactorMin) gridFactor = gridFactorMin;
+                if (gridFactor > gridFactorMax) gridFactor = gridFactorMax;
+                gridWidthX = (float)sizeX / gridFactor;
+                gridWidthZ = (float)sizeZ / gridFactor;
+            }
+
+            // Map a location in world coordinates to a location in grid coordinates
+            public void MapLocationToGrid(CoordType location,ref CoordType gridLocation)
+            {
+                float xbin = (float)(location.X - minXLocation) / gridWidthX;
+                gridLocation.X = (int)(xbin);
+                float zbin = (float)(location.Z - minZLocation) / gridWidthZ;
+                gridLocation.Z = (int)(zbin);
+                gridLocation.Z = (gridFactor - 1) - gridLocation.Z; // because the grid "origin" is the lower left corner, not the upper left corner
+
+                if (gridLocation.Z < 0 || gridLocation.Z >= gridFactor || gridLocation.X < 0 || gridLocation.X >= gridFactor)
+                {
+                    // there was a problem.  maybe the location coordinates we were given were out of the bounds of the map grid.
+                    System.Diagnostics.Debug.WriteLine("Runtime error detected in ::MapLocationToGrid()");
+
+                    gridLocation.X = 0;
+                    gridLocation.Z = 0;
+                }
+            }
+
+            public float area()
+            {
+                return (float)sizeX * (float)sizeZ;
+            }
+        };
+
+        WorldMapGridType worldGrid;
+
         public class ConsoleClassType
         {
             public enum ResultClass { summary, prefabList, prefabMap, water, nowhere };
@@ -72,10 +175,9 @@ namespace RWGAnalyzerDeluxe
 
         };
 
-        int gridFactor    = 10;
-        int gridFactorMax = 20;
-        int gridFactorMin = 4;
-
+        float waterFillThresholdToShow = 0.5f;
+        bool DoShowWaterDistribution = false;
+        bool analyzeWater = true;
         string worldFolder = "";
         ConsoleClassType Console;
         FolderBrowserDialog folderPicker;
@@ -84,6 +186,7 @@ namespace RWGAnalyzerDeluxe
         XmlDocument xwaterdoc;
         int[,] bins;
         Color[,] colorBins;
+        ulong [,] waterbins;
         List<itemType> namesList;
         List<string> traderList;
         int[] typecounts;
@@ -101,6 +204,7 @@ namespace RWGAnalyzerDeluxe
                 for (int z = 0; z < di; z++)
                 {
                     bins[x,z] = 0;
+                    waterbins[x, z] = 0;
                     RefreshBins(x, z);
                 }
             }
@@ -121,16 +225,18 @@ namespace RWGAnalyzerDeluxe
             //
             // dynamically generate the text blocks inside each cell of the display grid:
             //
-            for (i = 0; i < gridFactor; i++) { ResultsGrid.ColumnDefinitions.Add(new ColumnDefinition()); }
-            for (j = 0; j < gridFactor; j++) { ResultsGrid.RowDefinitions.Add(new RowDefinition()); }
+            for (i = 0; i < worldGrid.gridFactor; i++) { ResultsGrid.ColumnDefinitions.Add(new ColumnDefinition()); }
+            for (j = 0; j < worldGrid.gridFactor; j++) { ResultsGrid.RowDefinitions.Add(new RowDefinition()); }
 
-            for (i = 0; i < gridFactor; i++)
+            for (i = 0; i < worldGrid.gridFactor; i++)
             {
-                for (j = 0; j < gridFactor; j++)
+                for (j = 0; j < worldGrid.gridFactor; j++)
                 {
                     TextBlock txt1 = new TextBlock();
                     txt1.Text = "?";
-                    if (gridFactor < 11) txt1.FontSize = 20;
+                    txt1.FontFamily = new FontFamily("Courier New");
+
+                    if (worldGrid.gridFactor < 11) txt1.FontSize = 20;
                     else txt1.FontSize = 12;
 
                     txt1.FontWeight = FontWeights.Normal;
@@ -155,18 +261,21 @@ namespace RWGAnalyzerDeluxe
             folderPicker.ShowNewFolderButton = false;
             Console.setTextBox(ConsoleClassType.ResultClass.summary, TextBlockSummary);
             Console.setTextBox(ConsoleClassType.ResultClass.prefabList, PrefabSummary);
-            
+
+            worldGrid = new WorldMapGridType();
             xinfoDoc  = new XmlDocument();
             xdoc      = new XmlDocument();
             xwaterdoc = new XmlDocument();
-            bins      = new int[gridFactorMax, gridFactorMax];
-            colorBins = new Color[gridFactorMax, gridFactorMax];
+            bins      = new int[WorldMapGridType.gridFactorMax, WorldMapGridType.gridFactorMax];
+            waterbins = new ulong[WorldMapGridType.gridFactorMax, WorldMapGridType.gridFactorMax];
+            colorBins = new Color[WorldMapGridType.gridFactorMax, WorldMapGridType.gridFactorMax];
             namesList = new List<itemType>();
             traderList= new List<string>();
-            typecounts       = new int[14];
-            typenames        = new string[14];
-            typenamesInclude = new bool[14];
+            typecounts       = new int[15];
+            typenames        = new string[15];
+            typenamesInclude = new bool[15];
             typenames_ignore = new string[4];
+            biomeColors = new List<ColorTableItem>();
 
             typenames[0] = "other";
             typenames[1] = "trader";
@@ -182,6 +291,7 @@ namespace RWGAnalyzerDeluxe
             typenames[11] = "factory";
             typenames[12] = "field";
             typenames[13] = "army";
+            typenames[14] = "business";
             typenames_ignore[0] = "sign";
             typenames_ignore[1] = "street_light";
             typenames_ignore[2] = "tree_";
@@ -209,7 +319,11 @@ namespace RWGAnalyzerDeluxe
             }
 
             TextBlock tb = new TextBlock();
-            tb.Text = "Summary of types:";
+            tb.Text = "Summary of prefab types:";
+            tb.FontWeight = FontWeights.Bold;
+            tb.TextAlignment = TextAlignment.Left;
+            tb.VerticalAlignment = VerticalAlignment.Center;
+            tb.FontFamily = new FontFamily("Courier New");
             Grid.SetColumn(tb, 0);
             Grid.SetRow(tb, 0);
             LegendGrid.Children.Add(tb);
@@ -222,7 +336,8 @@ namespace RWGAnalyzerDeluxe
                 cb.IsChecked = true;
                 cb.VerticalAlignment = VerticalAlignment.Center;
                 cb.Checked += new RoutedEventHandler(HandleClick);
-                cb.Unchecked += new RoutedEventHandler(HandleClick);                            
+                cb.Unchecked += new RoutedEventHandler(HandleClick);
+                cb.FontFamily = new FontFamily("Courier New");
                 Grid.SetColumn(cb, 0);
                 Grid.SetRow(cb, i+1);
                 LegendGrid.Children.Add(cb);
@@ -297,93 +412,181 @@ namespace RWGAnalyzerDeluxe
         }
 
         private void ProcessBiomesBitmap(string fp)
-        {
-            
+        {            
             Uri biomesUri = new Uri(fp + "/biomes.png");
             BitmapImage img = new BitmapImage(biomesUri);
-            int x, z;
+            int x, z,i,j;
             var stride = img.PixelWidth * (img.Format.BitsPerPixel / 8);
             byte[] pixels = new byte[stride * img.PixelHeight];
-            ulong[,] binRed = new ulong [gridFactor, gridFactor];
-            ulong[,] binGreen = new ulong[gridFactor, gridFactor];
-            ulong[,] binBlue = new ulong[gridFactor, gridFactor];
-            ulong[,] binCount = new ulong[gridFactor, gridFactor];
-
+            ulong[,] binRed = new ulong [worldGrid.gridFactor, worldGrid.gridFactor];
+            ulong[,] binGreen = new ulong[worldGrid.gridFactor, worldGrid.gridFactor];
+            ulong[,] binBlue = new ulong[worldGrid.gridFactor, worldGrid.gridFactor];
+            ulong[,] binCount = new ulong[worldGrid.gridFactor, worldGrid.gridFactor];
+            
             TextBlockStatus.Text = "Looking at the biomes...";
 
-            // this is very unnecessary
-            Random rseq = new Random();
-            Color[] randoColor = new Color[16];
-            for (x = 0; x < 16; x++)
-            {
-                byte b = (byte)rseq.Next(256);
-                randoColor[x] = Color.FromRgb(b, b, b);
-            }
+            biomeColors.Clear();                     
 
+            // copy biome map image to array (this will take a lot of memory most likely)
             img.CopyPixels(pixels, stride, 0);
 
-            int binWidth  = img.PixelWidth / gridFactor;
-            int binHeight = img.PixelHeight / gridFactor;
             System.Windows.Forms.Application.DoEvents();
 
-            for (z=0;z< img.PixelHeight;z++)
+            worldGrid.Init(img.PixelWidth,img.PixelHeight);
+
+            Color pixelColor = new Color();
+            CoordType pixelWorldCoord = new CoordType();
+            CoordType gridCoord = new CoordType();
+            
+            pixelColor.A = 255;
+            int pixels_per_grid_z = img.PixelHeight / worldGrid.gridFactor;
+            int grid_z = 0;
+
+            for(grid_z=0;grid_z<worldGrid.gridFactor;grid_z++)
             {
-                for(x=0;x<img.PixelWidth;x++)
+                for (z = 0; z < pixels_per_grid_z; z++)
                 {
-                    int index = z * stride + 4 * x;
-                    byte blue   = pixels[index];
-                    byte green = pixels[index + 1];
-                    byte red  = pixels[index + 2];
+                    pixelWorldCoord.Z = (img.PixelHeight / 2) - ((grid_z*pixels_per_grid_z) + z) - 1;
 
-                    float xbin = (float)(x - 0) / binWidth;
-                    int xbinInt = (int)(xbin);
-                    xbinInt = xbinInt >= gridFactor ? gridFactor-1 : xbinInt;
+                    for (x = 0; x < img.PixelWidth; x++)
+                    {
+                        int index = (grid_z * pixels_per_grid_z + z) * stride + (4 * x);
+                        byte blue = pixels[index];
+                        byte green = pixels[index + 1];
+                        byte red = pixels[index + 2];
 
-                    float zbin = (float)(z - 0) / binHeight;
-                    int zbinInt = (int)(zbin);
-                    zbinInt = zbinInt >= gridFactor ? gridFactor-1 : zbinInt;
-                    //zbinInt = 9 - zbinInt;
-                    
-                      binRed[xbinInt, zbinInt] += red;
-                    binGreen[xbinInt, zbinInt] += green;
-                     binBlue[xbinInt, zbinInt] += blue;
-                    binCount[xbinInt, zbinInt] += 1;                    
+                        pixelColor.R = red;
+                        pixelColor.G = green;
+                        pixelColor.B = blue;
+
+                        bool k = false;
+
+                        for (j = 0; j < biomeColors.Count; j++)
+                        {
+                            if (biomeColors[j].color.Equals(pixelColor))
+                            {
+                                k = true;
+                                biomeColors[j].count++;
+                                break;
+                            }
+                        }
+
+                        if (k == false)
+                        {
+                            ColorTableItem newcolor = new ColorTableItem();
+                            newcolor.color = pixelColor;
+                            newcolor.count = 1;
+                            biomeColors.Add(newcolor);
+                            System.Diagnostics.Debug.WriteLine("new biome color: " + newcolor.color);
+                        }
+
+                        pixelWorldCoord.X = x - (img.PixelWidth / 2) - 1;
+
+                        worldGrid.MapLocationToGrid(pixelWorldCoord, ref gridCoord);
+
+                        binRed[gridCoord.X, grid_z] += red;
+                        binGreen[gridCoord.X, grid_z] += green;
+                        binBlue[gridCoord.X, grid_z] += blue;
+                        binCount[gridCoord.X, grid_z] += 1;
+                    }
                 }
-
-                // total waste of cpu cycles here
-                int rx = rseq.Next(gridFactor);
-                int rz = rseq.Next(gridFactor);
-                SetGridCellBackgroundColor(ResultsGrid, randoColor[rseq.Next(16)], rx, rz);
-                System.Windows.Forms.Application.DoEvents();
+                // upgrade grid colors as we go
+                for (x = 0; x < worldGrid.gridFactor; x++)
+                {
+                        binRed   [x, grid_z] /= binCount[x, grid_z];
+                        binGreen [x, grid_z] /= binCount[x, grid_z];
+                        binBlue  [x, grid_z] /= binCount[x, grid_z];
+                        colorBins[x, grid_z].R =   (byte)binRed[x, grid_z];
+                        colorBins[x, grid_z].G = (byte)binGreen[x, grid_z];
+                        colorBins[x, grid_z].B =  (byte)binBlue[x, grid_z];
+                        colorBins[x, grid_z].A = 255;
+                        SetGridCellBackgroundColor(ResultsGrid, colorBins[x, grid_z], grid_z, x);
+                        System.Windows.Forms.Application.DoEvents();
+                }                                
             }
 
-            for(z=0;z< gridFactor; z++)
+            float area = (float)img.PixelWidth * (float)img.PixelHeight;
+            float pct;
+            /*System.Diagnostics.Debug.WriteLine("the map contained " + biomeColors.Count + " unique colors.");
+            foreach (ColorTableItem biomecoloritem in biomeColors)
             {
-                for(x=0;x< gridFactor; x++)
-                {
-                    binRed[x, z] /= binCount[x, z];
-                    binGreen[x, z] /= binCount[x, z];
-                    binBlue[x, z] /= binCount[x, z];
+                pct = (float)biomecoloritem.count / area;
+                pct *= 100.0f;
+                pct = (int)pct;
+                System.Diagnostics.Debug.WriteLine("biome color " + biomecoloritem.color + " appears " + biomecoloritem.count + " times (" + pct + "%)");                 
+            }*/
 
-                    colorBins[x, z].R = (byte)binRed[x, z];
-                    colorBins[x, z].G = (byte)binGreen[x, z];
-                    colorBins[x, z].B = (byte)binBlue[x, z];
-                    colorBins[x, z].A = 255;
-                    SetGridCellBackgroundColor(ResultsGrid, colorBins[x,z], z, x);
-                    System.Windows.Forms.Application.DoEvents();
-                }
+            //
+            // dynamically setup biome color analysis grid
+            //
+            BiomesGrid.Children.Clear();
+            BiomesGrid.ColumnDefinitions.Clear();
+            BiomesGrid.RowDefinitions.Clear();
+            BiomesGrid.ColumnDefinitions.Add(new ColumnDefinition());
+            for (j = 0; j <= biomeColors.Count; j++) { BiomesGrid.RowDefinitions.Add(new RowDefinition()); }
+
+            /*Border border = new Border();
+            border.BorderThickness = new Thickness(1);
+            border.CornerRadius = new CornerRadius(3);
+            BiomesGrid.Children.Add(border);*/
+
+            TextBlock txt1 = new TextBlock();
+            txt1.Text = "Biome distribution (% of land area):";
+            txt1.FontSize = 12;
+            txt1.FontWeight = FontWeights.Bold;
+            txt1.TextAlignment = TextAlignment.Left;
+            txt1.VerticalAlignment = VerticalAlignment.Center;
+            txt1.FontFamily = new FontFamily("Courier New");
+
+            Grid.SetColumn(txt1, 0);
+            Grid.SetRow(txt1, 0);
+            BiomesGrid.Children.Add(txt1);
+
+            for (i = 0; i < biomeColors.Count; i++)
+            {
+                txt1 = new TextBlock();
+                uint colorvalue = (uint)((biomeColors[i].color.R << 8) | biomeColors[i].color.G) << 8 | biomeColors[i].color.B;
+                pct = (float)biomeColors[i].count / area;
+                pct *= 100.0f;
+                pct = (int)pct;
+
+                if (colorvalue == 0xffffff) txt1.Text = "Snow          ";
+                else if (colorvalue == 0xffa800) txt1.Text = "Wasteland     ";
+                else if (colorvalue == 0xba00ff) { txt1.Text = "Burnt Forest  "; txt1.Foreground = Brushes.White; }
+                else if (colorvalue == 0xffe477) txt1.Text = "Desert        ";
+                else if (colorvalue == 0x004000) { txt1.Text = "Pine Forest   "; txt1.Foreground = Brushes.White; }
+                else txt1.Text = "Other (" + colorvalue.ToString("X") + ")";
+                txt1.Text += "\t" + pct.ToString() + "%";
+
+                txt1.FontSize = 12;
+                txt1.FontWeight = FontWeights.Bold;
+                txt1.TextAlignment = TextAlignment.Left;
+                txt1.VerticalAlignment = VerticalAlignment.Center;
+                txt1.FontFamily = new FontFamily("Courier New");
+
+                Grid.SetColumn(txt1, 0);
+                Grid.SetRow(txt1, i+1);
+                txt1.Background = new SolidColorBrush(biomeColors[i].color);
+                BiomesGrid.Children.Add(txt1);                            
             }
         }        
 
         private void RefreshBins(int x,int z)
         {
-            if(x>=gridFactor || x<0 || z>=gridFactor || z<0)
+            if(x>= worldGrid.gridFactor || x<0 || z>= worldGrid.gridFactor || z<0)
             {
                 Console.WriteLine("Error during processing.");
                 return;
             }
             TextBlock t = GetGridChildElement(ResultsGrid, z, x) as TextBlock;
-            if (t != null) t.Text = bins[x, z].ToString();
+            if (t != null)
+            {
+                if (DoShowWaterDistribution)
+                {
+                    t.Text = waterbins[x, z].ToString();
+                }
+                else t.Text = bins[x, z].ToString();
+            }
         }
 
         private void Analyze(bool initialize=true)
@@ -391,10 +594,6 @@ namespace RWGAnalyzerDeluxe
             bool isknown;
             int counts = 0;
             string fpfn;
-            char[] charSeparators = new char[] { ',' };
-            string[] result;
-            int xSize = 8192;
-            int zSize = 8192;
             int x, z;
             int maxXLocation = -100;
             int minXLocation = 100;
@@ -405,18 +604,20 @@ namespace RWGAnalyzerDeluxe
             int k;
             int thisItemType = -1;
             int excludedCount = 0;
+            CoordType coord = new CoordType();
+            CoordType gridCoord = new CoordType();
 
             System.Diagnostics.Debug.WriteLine("Start ::Analyze()");
 
             if(initialize) SetupGrid();
+            Console.ClearAll();
 
             if (worldFolder.Length < 2)
             {
-                Console.WriteLine("This does not look like a valid path.", ConsoleClassType.ResultClass.summary);
+                Console.WriteLine("\nNo valid path to analyze.", ConsoleClassType.ResultClass.summary);
                 return;
             }
 
-            Console.ClearAll();
             this.Title = "RWGAnalyzer [" + worldFolder + "]";
             TextBlockStatus.Text = "Working...";
             namesList.Clear();
@@ -447,16 +648,13 @@ namespace RWGAnalyzerDeluxe
                 if (nextName.Equals("HeightMapSize"))
                 {
                     string size = node.Attributes["value"].Value;
-                    result = size.Split(charSeparators, StringSplitOptions.None);
-                    xSize = Int16.Parse(result[0]);
-                    zSize = Int16.Parse(result[1]);
+
+                    coord.Parse(size);
+
+                    worldGrid.Init(coord.X, coord.Y);
                 }
             }
-            float widthX = (float)xSize / gridFactor;
-            float widthZ = (float)zSize / gridFactor; //(float)(maxZLocation-minZLocation+1) * .1f;
-            int worldminXLocation = -xSize / 2;
-            int worldminZLocation = -zSize / 2;
-            Console.WriteLine("The world size is " + xSize + " by " + zSize + ". Each grid cell represents " + widthX + " by " + widthZ + " meters.", ConsoleClassType.ResultClass.summary);
+            Console.WriteLine("The world size is " + worldGrid.sizeX + " by " + worldGrid.sizeZ + ". Each grid cell represents " + worldGrid.gridWidthX + " by " + worldGrid.gridWidthZ + " meters.", ConsoleClassType.ResultClass.summary);
 
             if (initialize)
             {
@@ -469,7 +667,7 @@ namespace RWGAnalyzerDeluxe
 
                     if(filesize < 90000)
                     {
-                        Console.WriteLine("The biomes map file (biomes.png) does not look like a valid PNG... skipping biome analysis");
+                        Console.WriteLine("biomes.png does not look like a valid PNG... skipping biome analysis",ConsoleClassType.ResultClass.summary);
                     }
                     else 
                         ProcessBiomesBitmap(worldFolder);
@@ -543,28 +741,22 @@ namespace RWGAnalyzerDeluxe
                         namesList.Add(newitem);
                     }
 
-                    result = location.Split(charSeparators, StringSplitOptions.None);
-                    int xLocation = Int16.Parse(result[0]);
-                    int yLocation = Int16.Parse(result[1]);
-                    int zLocation = Int16.Parse(result[2]);
-
+                    coord.Parse(location);
+                                        
                     // trader locations are also tracked specially here so that we can analyze them separate from other pois                
-                    if (nextName.Contains("trader"))
-                    {
-                        traderList.Add(location);
-                    }
+                    if (nextName.Contains("trader")) traderList.Add(location);
 
                     //
                     // keep track of the most distant locations in each dimension:
                     //
-                    if (xLocation > maxXLocation) maxXLocation = xLocation;
-                    if (xLocation < minXLocation) minXLocation = xLocation;
+                    if (coord.X > maxXLocation) maxXLocation = coord.X;
+                    if (coord.X < minXLocation) minXLocation = coord.X;
 
-                    if (yLocation > maxYLocation) maxYLocation = yLocation;
-                    if (yLocation < minYLocation) minYLocation = yLocation;
+                    if (coord.Y > maxYLocation) maxYLocation = coord.Y;
+                    if (coord.Y < minYLocation) minYLocation = coord.Y;
 
-                    if (zLocation > maxZLocation) maxZLocation = zLocation;
-                    if (zLocation < minZLocation) minZLocation = zLocation;
+                    if (coord.Z > maxZLocation) maxZLocation = coord.Z;
+                    if (coord.Z < minZLocation) minZLocation = coord.Z;
 
                     //
                     // sort the the prefab into the correct bin on the grid
@@ -575,18 +767,13 @@ namespace RWGAnalyzerDeluxe
                         Console.WriteLine("Error encountered during processing!", ConsoleClassType.ResultClass.summary);
                         return;
                     }
-
+                                        
                     if (typenamesInclude[thisItemType] == true)
                     {
-                        float xbin = (float)(xLocation - worldminXLocation) / widthX;
-                        int xbinInt = (int)(xbin);
-
-                        float zbin = (float)(zLocation - worldminZLocation) / widthZ;
-                        int zbinInt = (int)(zbin);
-                        zbinInt = (gridFactor - 1) - zbinInt;
-
-                        bins[xbinInt, zbinInt] += 1;
-                        RefreshBins(xbinInt, zbinInt);
+                        worldGrid.MapLocationToGrid(coord,ref gridCoord);
+                    
+                        bins[gridCoord.X,gridCoord.Z] += 1;
+                        RefreshBins(gridCoord.X, gridCoord.Z);
                     }
                     else excludedCount++;
                 }
@@ -633,41 +820,41 @@ namespace RWGAnalyzerDeluxe
                 pcti = (int)pct;
                 pct = pcti * .01f;
                 System.Windows.Controls.CheckBox cbox = GetGridChildElement(LegendGrid, i+1, 0) as System.Windows.Controls.CheckBox;
-                cbox.Content = typenames[i] + " = " + typecounts[i].ToString().PadLeft(4) + " (" + pct + "%)";
+                
+                // you have to do this if you want underscores to appear, otherwise wpf will suppress them from view
+                string fixedname = typenames[i];
+                fixedname = fixedname.Replace("_", "__");
+                cbox.Content = fixedname + " ".PadRight(14-typenames[i].Length) + " = " + typecounts[i].ToString() + " (" + pct + "%)";
             }
 
             //
             // analyze trader locations
             //
-            double aveDistance = 0.0;
-            int countdistances = 0;
-            foreach (string position in traderList)
+            if (traderList.Count > 1)
             {
-                result = position.Split(charSeparators, StringSplitOptions.None);
-                int x1 = Int16.Parse(result[0]);
-                int z1 = Int16.Parse(result[2]);
-                double nearestNeighborDistance = 10000.0;
-
-                foreach (string position2 in traderList)
+                double aveDistance = 0.0;
+                int countdistances = 0;
+                CoordType coord2 = new CoordType();
+                foreach (string position in traderList)
                 {
-                    if (position.Equals(position2) == false)
+                    coord.Parse(position);
+                    double nearestNeighborDistance = 10000.0;
+                    foreach (string position2 in traderList)
                     {
-                        result = position2.Split(charSeparators, StringSplitOptions.None);
-                        int x2 = Int16.Parse(result[0]);
-                        int z2 = Int16.Parse(result[2]);
-
-                        double distance = Math.Sqrt((x2 - x1) * (x2 - x1) + (z2 - z1) * (z2 - z1));
-                        if (distance < nearestNeighborDistance) nearestNeighborDistance = distance;
+                        if (position.Equals(position2) == false)
+                        {
+                            coord2.Parse(position2);
+                            double distance = coord2.distanceTo(coord);
+                            if (distance < nearestNeighborDistance) nearestNeighborDistance = distance;
+                        }
                     }
+                    aveDistance += nearestNeighborDistance;
+                    countdistances++;
                 }
-                aveDistance += nearestNeighborDistance;
-                countdistances++;
+                aveDistance /= (double)countdistances;
+                aveDistance = (int)(aveDistance + .5);
+                Console.WriteLine("On average, each trader is " + aveDistance + " meters away from another trader.", ConsoleClassType.ResultClass.summary);
             }
-            aveDistance /= (double)countdistances;
-            aveDistance = (int)(aveDistance + .5);
-            Console.WriteLine("On average, each trader is " + aveDistance + " meters away from another trader.", ConsoleClassType.ResultClass.summary);
-
-            bool analyzeWater = true;
 
             if (analyzeWater)
             {
@@ -691,58 +878,49 @@ namespace RWGAnalyzerDeluxe
                 {
                     waterblockcount++;
                     string waterPos = node.Attributes["pos"].Value;
-                    result = waterPos.Split(charSeparators, StringSplitOptions.None);
-                    int waterX = Int16.Parse(result[0]);
-                    int waterZ = Int16.Parse(result[2]);
+                    coord.Parse(waterPos);                    
                 }
 
-                int problems = 0;
-                double worldSquareMeters = xSize * zSize;
-                double waterArea = (waterblockcount * waterBlockSize * waterBlockSize);
-                double pctWater = waterArea / worldSquareMeters;
-                pctWater *= 10000.0;
+                int problems = 0;                
+                float waterArea = (waterblockcount * waterBlockSize * waterBlockSize);
+                float pctWater = waterArea / worldGrid.area();
+                pctWater *= 10000.0f;
                 pctWater = (int)pctWater;
-                pctWater *= .01;
+                pctWater *= .01f;
                 Console.WriteLine("\nIdentified " + waterArea + " square meters of water, which is " + pctWater + "% of the land area.", ConsoleClassType.ResultClass.prefabList);
                 //Console.WriteLine("It appears that there are " + buildings_in_water + " buildings located in the water.");
-
-                /*
-                int[,] waterbins = new int[10, 10];
+         
+                // accumulate (count) how many water blocks are in each results-grid location
+                // note that water blocks are each larger than 1 world unit on a side (for some reason they are 8x8)
                 foreach (XmlNode node in xwaterdoc.DocumentElement.ChildNodes)
                 {
                     string location = node.Attributes["pos"].Value;
-                    result = location.Split(charSeparators, StringSplitOptions.None);
-                    int xLocation = Int16.Parse(result[0]);
-                    int zLocation = Int16.Parse(result[2]);
-
-                    float xbin = (float)(xLocation - minXLocation) / widthX;
-                    int xbinInt = (int)(xbin);
-
-                    float zbin = (float)(zLocation - minZLocation) / widthZ;
-                    int zbinInt = (int)(zbin);
-
-                    if (xbinInt < 0 || xbinInt > 9 || zbinInt < 0 || zbinInt > 9)
-                        problems++;
-                    else
-                        waterbins[xbinInt, zbinInt] += 1;
+                    coord.Parse(location);
+                    worldGrid.MapLocationToGrid(coord, ref gridCoord);                                                           
+                    waterbins[gridCoord.X,gridCoord.Z] += 1;
                 }
 
-                Console.WriteLine("In a grid with each block " + widthX + " by " + widthZ + " meters, here is the percentage of each grid block that is covered in water:", ConsoleClassType.ResultClass.prefabMap);
-                for (z = 9; z >= 0; z--)
+                float maxpct = 0f;
+                for (z = 0;z<worldGrid.gridFactor;z++)
                 {
-                    Console.Write("\t", ConsoleClassType.ResultClass.prefabMap);
-                    for (x = 0; x < 10; x++)
+                    for (x = 0; x < worldGrid.gridFactor; x++)
                     {
-                        float waterarea = waterbins[x, z] * waterBlockSize * waterBlockSize;
-                        pct = waterarea / (widthX * widthZ) * 1000.0f;
-                        pct = (int)pct;
-                        pct *= 0.1f;
-                        string s = pct.ToString("N1");
-                        Console.Write(s.PadLeft(4) + "%\t", ConsoleClassType.ResultClass.prefabMap);
+                        // the area that is water is the area of a single water block multiplied by how many water blocks are in this grid location
+                        float waterarea = waterbins[x, z] * (ulong)waterBlockSize * (ulong)waterBlockSize;
+                        pct = waterarea / (worldGrid.gridWidthX * worldGrid.gridWidthZ);
+
+                        if (pct > waterFillThresholdToShow)
+                        {
+                            colorBins[x, z] = Color.FromRgb(0, 0, 255);
+                            SetGridCellBackgroundColor(ResultsGrid, colorBins[x, z], z, x);
+                            System.Diagnostics.Debug.WriteLine("grid location [" + x + "," + z + "] marked is more than " + waterFillThresholdToShow + "x100% water");
+                        }
+                        if (pct > maxpct) maxpct = pct;                        
+                        RefreshBins(x, z);
                     }
-                    Console.Write("\n", ConsoleClassType.ResultClass.prefabMap);
                 }
-                */
+                System.Diagnostics.Debug.WriteLine("max pct water fill on any grid location was " + maxpct.ToString());
+                
             }
 
             System.Diagnostics.Debug.WriteLine("Finished ::Analyze()");
@@ -750,35 +928,32 @@ namespace RWGAnalyzerDeluxe
             RefreshButton.IsEnabled = false;
 
         }
-        
+
         private void SetAllButtonsEnabled(bool b)
         {            
             if(b==false) RefreshButton.IsEnabled = b;
-            GridGoLargerButton.IsEnabled = b;
-            GridGoSmallerButton.IsEnabled = b;
+            if(b==false || (b==true && worldGrid.gridFactor> WorldMapGridType.gridFactorMin)) GridGoLargerButton.IsEnabled = b;
+            if(b==false || (b==true && worldGrid.gridFactor < WorldMapGridType.gridFactorMax)) GridGoSmallerButton.IsEnabled = b;
             ChooseWorldButton.IsEnabled = b;
-
         }
-        private void Button_Click_1(object sender, RoutedEventArgs e)
+        private void Button_Click_LargerGrid(object sender, RoutedEventArgs e)
         {
-            gridFactor-=2;
-            if (gridFactor < gridFactorMin) gridFactor = gridFactorMin;
+            worldGrid.setGridFactor(worldGrid.gridFactor - 2);
             SetAllButtonsEnabled(false);
             Analyze(true);
             SetAllButtonsEnabled(true);
         }
 
-        private void Button_Click_2(object sender, RoutedEventArgs e)
+        private void Button_Click_SmallerGrid(object sender, RoutedEventArgs e)
         {
-            gridFactor+=2;
-            if (gridFactor > gridFactorMax) gridFactor = gridFactorMax;
+            worldGrid.setGridFactor(worldGrid.gridFactor + 2);
             SetAllButtonsEnabled(false);
             Analyze(true);
             SetAllButtonsEnabled(true);
 
         }
 
-        private void Button_Click_3(object sender, RoutedEventArgs e)
+        private void Button_Click_Refresh(object sender, RoutedEventArgs e)
         {
             SetAllButtonsEnabled(false);
             Analyze(false);
