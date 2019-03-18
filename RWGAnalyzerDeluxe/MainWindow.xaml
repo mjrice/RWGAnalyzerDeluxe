@@ -13,9 +13,7 @@
         <TextBlock x:Name="PrefabSummary" HorizontalAlignment="Left" Margin="654,25,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Height="212" Width="328" FontFamily="Courier New"><Run Text="Tex"/><Run Text="tBlock"/></TextBlock>
 
         <Grid Name="LegendGrid" HorizontalAlignment="Left" Height="275" Margin="654,410,0,0" VerticalAlignment="Top" Width="328"/>
-        <Button Name="GridGoLargerButton" Content="Show larger divisions" HorizontalAlignment="Left" Margin="41,690,0,0" VerticalAlignment="Top" Width="141" Click="Button_Click_LargerGrid" Height="25"/>
-        <Button Name="GridGoSmallerButton" Content="Show smaller divisions" HorizontalAlignment="Left" Margin="211,690,0,0" VerticalAlignment="Top" Width="140" Click="Button_Click_SmallerGrid" Height="25"/>
-        <TextBlock Name="TextBlockStatus" FontSize="20"  HorizontalAlignment="Left" Margin="659,3,0,0" TextWrapping="Wrap" Text="ABCDEF" VerticalAlignment="Top" Height="34" Width="323" Foreground="Red" FontStyle="Oblique"  />
+        <TextBlock Name="TextBlockStatus" FontSize="20"  HorizontalAlignment="Left" Margin="654,-2,0,0" TextWrapping="Wrap" Text="ABCDEF" VerticalAlignment="Top" Height="34" Width="323" Foreground="Red" FontStyle="Oblique"  />
         <Button Name="RefreshButton" IsEnabled="False" Content="Refresh" HorizontalAlignment="Left" Margin="654,690,0,0" VerticalAlignment="Top" Width="75" Height="25" Click="Button_Click_Refresh"/>
 
         <Grid Name="BiomesGrid"  HorizontalAlignment="Left" Height="163" Margin="654,242,0,0" VerticalAlignment="Top" Width="328">
@@ -24,6 +22,8 @@
                 <ColumnDefinition Width="277*"/>
             </Grid.ColumnDefinitions>
         </Grid>
+        <Slider ValueChanged="SliderGridFactor_ChangeValue" IsSnapToTickEnabled="True" Name="SliderGridFactor" Value="10" Minimum="4" Maximum="24" SmallChange="1" HorizontalAlignment="Left" Margin="203,697,0,0" VerticalAlignment="Top" Width="168" Height="40" TickPlacement="BottomRight" TickFrequency="2" LargeChange="2" Foreground="#FFAC0F0F"/>
+        <TextBlock HorizontalAlignment="Left" Margin="25,705,0,0" TextWrapping="NoWrap" TextAlignment="Center" Text="Set Analysis Grid Scale:" FontFamily="Courier New"  Width="178" Height="32" VerticalAlignment="Top"/>
 
 
     </Grid>

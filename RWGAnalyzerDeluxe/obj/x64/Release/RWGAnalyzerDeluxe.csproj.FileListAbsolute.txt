@@ -11,3 +11,4 @@ C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Rele
 C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe.csproj.GenerateResource.Cache
 C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe.exe
 C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe.pdb
+C:\Users\mrice\Documents\GitHub\RWGAnalyzerDeluxe\RWGAnalyzerDeluxe\obj\x64\Release\RWGAnalyzerDeluxe.csprojResolveAssemblyReference.cache

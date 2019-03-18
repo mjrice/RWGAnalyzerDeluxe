@@ -932,32 +932,33 @@ namespace RWGAnalyzerDeluxe
         private void SetAllButtonsEnabled(bool b)
         {            
             if(b==false) RefreshButton.IsEnabled = b;
-            if(b==false || (b==true && worldGrid.gridFactor> WorldMapGridType.gridFactorMin)) GridGoLargerButton.IsEnabled = b;
-            if(b==false || (b==true && worldGrid.gridFactor < WorldMapGridType.gridFactorMax)) GridGoSmallerButton.IsEnabled = b;
+            //if(b==false || (b==true && worldGrid.gridFactor> WorldMapGridType.gridFactorMin)) GridGoLargerButton.IsEnabled = b;
+            //if(b==false || (b==true && worldGrid.gridFactor < WorldMapGridType.gridFactorMax)) GridGoSmallerButton.IsEnabled = b;
             ChooseWorldButton.IsEnabled = b;
-        }
-        private void Button_Click_LargerGrid(object sender, RoutedEventArgs e)
-        {
-            worldGrid.setGridFactor(worldGrid.gridFactor - 2);
-            SetAllButtonsEnabled(false);
-            Analyze(true);
-            SetAllButtonsEnabled(true);
+            SliderGridFactor.IsEnabled = b;
         }
 
-        private void Button_Click_SmallerGrid(object sender, RoutedEventArgs e)
-        {
-            worldGrid.setGridFactor(worldGrid.gridFactor + 2);
-            SetAllButtonsEnabled(false);
-            Analyze(true);
-            SetAllButtonsEnabled(true);
+        bool refresh_analyze_map = false;
 
+        private void SliderGridFactor_ChangeValue(object sender,RoutedEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("slider value = " + SliderGridFactor.Value);
+            if (worldGrid != null)
+            {
+                worldGrid.gridFactor = (int)SliderGridFactor.Value;
+                SetupGrid();
+                refresh_analyze_map = true;
+                RefreshButton.IsEnabled = true;
+            }
+            //  worldGrid.setGridFactor((int)SliderGridFactor.Value);
         }
 
         private void Button_Click_Refresh(object sender, RoutedEventArgs e)
         {
             SetAllButtonsEnabled(false);
-            Analyze(false);
+            Analyze(refresh_analyze_map);
             SetAllButtonsEnabled(true);
+            refresh_analyze_map = false;
         }
     }
 }
