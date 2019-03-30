@@ -187,7 +187,7 @@ namespace RWGAnalyzerDeluxe
         int[,] bins;
         Color[,] colorBins;
         ulong [,] waterbins;
-        List<itemType> namesList;
+        List<itemType> prefabNamesList;
         List<string> traderList;
         int[] typecounts;
         string[] typenames;
@@ -269,7 +269,7 @@ namespace RWGAnalyzerDeluxe
             bins      = new int[WorldMapGridType.gridFactorMax, WorldMapGridType.gridFactorMax];
             waterbins = new ulong[WorldMapGridType.gridFactorMax, WorldMapGridType.gridFactorMax];
             colorBins = new Color[WorldMapGridType.gridFactorMax, WorldMapGridType.gridFactorMax];
-            namesList = new List<itemType>();
+            prefabNamesList = new List<itemType>();
             traderList= new List<string>();
             typecounts       = new int[15];
             typenames        = new string[15];
@@ -331,7 +331,7 @@ namespace RWGAnalyzerDeluxe
             for (i = 0; i < typenames.Length; i++)
             {
                 System.Windows.Controls.CheckBox cb = new System.Windows.Controls.CheckBox();
-                cb.Content = typenames[i] + "(?)";
+                cb.Content = typenames[i].Replace("_","__") + "(?)";                
                 cb.IsThreeState = false;
                 cb.IsChecked = true;
                 cb.VerticalAlignment = VerticalAlignment.Center;
@@ -350,19 +350,31 @@ namespace RWGAnalyzerDeluxe
             System.Diagnostics.Debug.WriteLine("HandleClick(" + sender + "," + e + ")");
             System.Windows.Controls.CheckBox cb = sender as System.Windows.Controls.CheckBox;
             int k = 0;
-
+            int i = 0;
+            bool id = false;
             // find which typename was checked or unchecked:
-            for(int i=0;i<typenames.Length;i++)
+            while(i<typenames.Length && id==false)            
             {
                 string cbStr = cb.Content as string;
-                if(cbStr.Contains(typenames[i]))
+
+                // checkbox labels have two underscores where the typenames only have one, so that wpf will display them correctly.
+                // so, to determine a match we have to do this:
+
+                string fudgedname = typenames[i].Replace("_", "__");
+
+                if (cbStr.Contains(fudgedname))
                 {
                     k = i;
                     if (cb.IsChecked==true) typenamesInclude[i] = true;
                     else typenamesInclude[i] = false;
-                    break;
+                    id = true;
+                    System.Diagnostics.Debug.WriteLine("this is typename " + typenames[i]);
                 }
+                i++;
             }
+
+            if (id == false)
+                System.Diagnostics.Debug.WriteLine("Runtime Error!  Checkbox item did not correspond to a typename item.");
 
             RefreshButton.IsEnabled = true;
         }
@@ -604,6 +616,7 @@ namespace RWGAnalyzerDeluxe
             int k;
             int thisItemType = -1;
             int excludedCount = 0;
+            int includedCount = 0;
             CoordType coord = new CoordType();
             CoordType gridCoord = new CoordType();
 
@@ -620,11 +633,15 @@ namespace RWGAnalyzerDeluxe
 
             this.Title = "RWGAnalyzer [" + worldFolder + "]";
             TextBlockStatus.Text = "Working...";
-            namesList.Clear();
+            prefabNamesList.Clear();
             traderList.Clear();
             ClearBins();
 
-            //
+            for(k=0;k<typenames.Length;k++)            
+            {                
+                System.Diagnostics.Debug.WriteLine("Type " + typenames[k] + " : Included = " + typenamesInclude[k]);
+            }
+            
             // load all the xml documents we need to analyze
             //
             if (initialize)
@@ -706,39 +723,43 @@ namespace RWGAnalyzerDeluxe
 
                 if (ignorePrefab == false)
                 {
-                    foreach (itemType item in namesList)
+                    foreach (itemType item in prefabNamesList)
                     {
-                        if (item.name.Equals(nextName))
+                        if (nextName.Equals(item.name)) 
                         {
                             isknown = true;
                             item.count++;
                             thisItemType = item.type;
+                            //if (typenamesInclude[thisItemType] == true) System.Diagnostics.Debug.WriteLine("Item name is " + nextName);                            
                             break;
                         }
                     }
 
-                    // namesList contains the full name of the prefab that we have identified.  The type names are groups of similar prefabs.
+                    // prefabNamesList contains the full name of the prefab that we have identified.  The type names are groups of similar prefabs.
                     // for example, any prefab name that contains the word "field" is grouped together under the legend, even though there
-                    // may be several items in namesList (blueberry_field, potato_field, etc.)
-                    if (isknown == false)
+                    // may be several items in prefabNamesList (blueberry_field, potato_field, etc.)
+
+                    if (isknown == false) // we have not seen a prefab with this name before
                     {
                         itemType newitem = new itemType();
                         newitem.name = nextName;
                         newitem.count = 1;
                         newitem.type = 0;
                         thisItemType = 0;
-                        for (k = 1; k < typenames.Length; k++)
+                        k = 1; // typename 0 is "other" so begin this search at 1
+                        while(k<typenames.Length && thisItemType==0)                        
                         {
                             if (typenames[k].Length > 0) // sanity check
                             {
-                                if (nextName.Contains(typenames[k]))
+                                if (nextName.Contains(typenames[k])) // e.g. "blueberry_field" contains "field"
                                 {
                                     newitem.type = k;
-                                    thisItemType = k;
+                                    thisItemType = k;                                    
                                 }
                             }
+                            k++;
                         }
-                        namesList.Add(newitem);
+                        prefabNamesList.Add(newitem);
                     }
 
                     coord.Parse(location);
@@ -774,24 +795,27 @@ namespace RWGAnalyzerDeluxe
                     
                         bins[gridCoord.X,gridCoord.Z] += 1;
                         RefreshBins(gridCoord.X, gridCoord.Z);
+                        includedCount++;
                     }
                     else excludedCount++;
                 }
                 System.Windows.Forms.Application.DoEvents();
             }
 
-            System.Diagnostics.Debug.WriteLine("Excluded " + excludedCount);
+            System.Diagnostics.Debug.WriteLine("Count: " + counts);
+            System.Diagnostics.Debug.WriteLine("Included: " + includedCount);
+            System.Diagnostics.Debug.WriteLine("Excluded: " + excludedCount);
 
-            Console.WriteLine("There were " + counts + " prefab instances of " + namesList.Count + " types found in this world.", ConsoleClassType.ResultClass.summary);
+            Console.WriteLine("There were " + counts + " prefab instances of " + prefabNamesList.Count + " types found in this world.", ConsoleClassType.ResultClass.summary);
             Console.WriteLine("Prefabs will spawn between coordinates (" + minXLocation + "," + minYLocation + "," + minZLocation + ") and (" + maxXLocation + "," + maxYLocation + "," + maxZLocation + ")", ConsoleClassType.ResultClass.summary);
 
             // sort the list of prefabs (most common ones first)
-            namesList.Sort((A, B) => B.count.CompareTo(A.count));
+            prefabNamesList.Sort((A, B) => B.count.CompareTo(A.count));
 
             for (int i = 0; i < typecounts.Length; i++) typecounts[i] = 0;
 
             // tally count of each prefab type found
-            foreach (itemType item in namesList)
+            foreach (itemType item in prefabNamesList)
             {
                 typecounts[item.type] += item.count;
             }
@@ -799,7 +823,7 @@ namespace RWGAnalyzerDeluxe
             int mostcommoncount = 0;
             for (int i = 0; i < 10; i++)
             {
-                mostcommoncount += namesList[i].count;
+                mostcommoncount += prefabNamesList[i].count;
             }
 
             float pct;
@@ -811,7 +835,7 @@ namespace RWGAnalyzerDeluxe
             Console.WriteLine("Prefab:              \tOccurances:");
             for (int i = 0; i < 10; i++)
             {
-                Console.WriteLine(namesList[i].name.PadRight(21) + "\t" + namesList[i].count, ConsoleClassType.ResultClass.prefabList);
+                Console.WriteLine(prefabNamesList[i].name.PadRight(21) + "\t" + prefabNamesList[i].count, ConsoleClassType.ResultClass.prefabList);
             }
                         
             for (int i = 0; i < typecounts.Length; i++)
